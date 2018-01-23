@@ -1,6 +1,10 @@
 package jmx
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"sort"
+	"strings"
+)
 
 type JMXMapping struct {
 	MBean      string
@@ -39,9 +43,9 @@ type Target struct {
 //    }
 // ]
 type RequestBlock struct {
-	Type      string   `json:"type"`
-	MBean     string   `json:"mbean"`
-	Attribute []string `json:"attribute"`
+	Type      string      `json:"type"`
+	MBean     string      `json:"mbean"`
+	Attribute []string    `json:"attribute"`
 	Target    TargetBlock `json:"target"`
 }
 
@@ -59,16 +63,30 @@ func buildRequestBodyAndMapping(mappings []JMXMapping) ([]byte, map[string]strin
 		rb := RequestBlock{
 			Type:  "read",
 			MBean: mapping.MBean,
-			Target: TargetBlock {
-				Url: mapping.Target.Url,
-				User: mapping.Target.User,
+			Target: TargetBlock{
+				Url:      mapping.Target.Url,
+				User:     mapping.Target.User,
 				Password: mapping.Target.Password,
 			},
 		}
 
 		for _, attribute := range mapping.Attributes {
 			rb.Attribute = append(rb.Attribute, attribute.Attr)
-			responseMapping[mapping.MBean+"_"+attribute.Attr] = attribute.Field
+			// MBean format (java.lang:type=GarbageCollector,name=PS MarkSweep)
+			// Doamin : java.lang
+			// Properties : type=GarbageCollector
+			//              name=PS MarkSweep
+			sortedMBeanKey := make([]byte, 0, len(mapping.MBean))
+			mBeanDomainProp := strings.Split(mapping.MBean, ":")
+			sortedMBeanKey = append(sortedMBeanKey, mBeanDomainProp[0]...)
+			sortedMBeanKey = append(sortedMBeanKey, ':')
+			mBeanProps := strings.Split(mBeanDomainProp[1], ",")
+			sort.Strings(mBeanProps)
+			for _, v := range mBeanProps {
+				sortedMBeanKey = append(sortedMBeanKey, v...)
+				sortedMBeanKey = append(sortedMBeanKey, ',')
+			}
+			responseMapping[string(sortedMBeanKey)+"_"+attribute.Attr] = attribute.Field
 		}
 		blocks = append(blocks, rb)
 	}

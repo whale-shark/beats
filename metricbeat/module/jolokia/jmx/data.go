@@ -2,6 +2,8 @@ package jmx
 
 import (
 	"encoding/json"
+	"sort"
+	"strings"
 
 	"github.com/joeshaw/multierror"
 	"github.com/pkg/errors"
@@ -77,7 +79,17 @@ func parseResponseEntry(
 	mapping map[string]string,
 ) error {
 	// Create metric name by merging mbean and attribute fields.
-	var metricName = mbeanName + "_" + attributeName
+	sortedMBeanKey := make([]byte, 0, len(mbeanName))
+	mBeanDomainProp := strings.Split(mbeanName, ":")
+	sortedMBeanKey = append(sortedMBeanKey, mBeanDomainProp[0]...)
+	sortedMBeanKey = append(sortedMBeanKey, ':')
+	mBeanProps := strings.Split(mBeanDomainProp[1], ",")
+	sort.Strings(mBeanProps)
+	for _, v := range mBeanProps {
+		sortedMBeanKey = append(sortedMBeanKey, v...)
+		sortedMBeanKey = append(sortedMBeanKey, ',')
+	}
+	metricName := string(sortedMBeanKey) + "_" + attributeName
 
 	key, exists := mapping[metricName]
 	if !exists {
